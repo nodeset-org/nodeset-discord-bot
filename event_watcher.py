@@ -8,10 +8,9 @@ import asyncio
 load_dotenv()
 
 
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
-
+DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 ALCHEMY_API_KEY = os.getenv("ALCHEMY_API_KEY")
+
 WETH_VAULT_ADDRESS = "0xBB22d59B73D7a6F3A8a83A214BECc67Eb3b511fE"
 RPL_VAULT_ADDRESS = "0x1DB1Afd9552eeB28e2e36597082440598B7F1320"
 SUPERNODE_ACCOUNT_ADDRESS = "0x2A906f92B0378Bb19a3619E2751b1e0b8cab6B29"
@@ -22,21 +21,25 @@ DEPOSIT_TOPIC = "0xdcbc1c05240f31ff3ad067ef1ee35ce4997762752e3a095284754544f4c70
 WITHDRAW_TOPIC = "0xfbde797d201c681b91056529119e0b02407c7bb96a4a2c75c01fc9667232c8db"
 MINIPOOL_CREATED_TOPIC = "0x08b4b91bafaf992145c5dd7e098dfcdb32f879714c154c651c2758a44c7aeae4"
 
-SLEEP_TIME = int(os.getenv("SLEEP_TIME")) if os.getenv("SLEEP_TIME") else 300  # Polling interval in seconds
+SLEEP_TIME = int(os.getenv("SLEEP_TIME", 10))  # Polling interval in seconds
+last_block = int(os.getenv("LAST_BLOCK", 21024052))  # Starting block
 
 intents = discord.Intents.default()
 client = discord.Client(intents=intents)
 
 async def notify_channel(message):
-    channel = client.get_channel(CHANNEL_ID)
-    await channel.send(message)
+    payload = {
+        "content": message,
+    }
+    requests.post(DISCORD_WEBHOOK_URL, json=payload)
+
 
 # Poll for:
 # - New deposits and withdrawals from the WETH and RPL vaults
 # - New minipools created by supernodes
 async def poll_ethereum_events():
     # Start at when Constellation was deployed (-10 blocks to be safe)
-    last_block = int(os.getenv("LAST_BLOCK")) if os.getenv("LAST_BLOCK") else 20946645
+    global last_block
 
     while True:
         print(f"Processing block: {last_block}")
@@ -78,16 +81,16 @@ async def poll_ethereum_events():
                 # Notify discord channel
                 if topic == DEPOSIT_TOPIC:
                     message = (
-                        f"🚀 **New Deposit** of {assets_value:.18f} {asset_type} at {address}\n"
-                        f"📦 Transaction Hash: {transaction_hash}\n"
+                        f"🚀 **New Deposit** of {assets_value:.2f} {asset_type} at {address}\n"
+                        f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash})\n"
                         f"🔗 Block Number: {block_number}"
                     )
                     await notify_channel(message)
 
                 elif topic == WITHDRAW_TOPIC:
                     message = (
-                        f"💸 **New Withdrawal** of {assets_value:.18f} {asset_type} from {address}\n"
-                        f"📦 Transaction Hash: {transaction_hash}\n"
+                        f"💸 **New Withdrawal** of {assets_value:.2f} {asset_type} from {address}\n"
+                        f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash})\n"
                         f"🔗 Block Number: {block_number}\n"
                     )
                     await notify_channel(message)
@@ -96,7 +99,7 @@ async def poll_ethereum_events():
                     minipool_address = f"0x{log['topics'][1][26:]}"
                     message = (
                         f"🎉 **New Minipool Created** at {minipool_address}\n"
-                        f"📦 Transaction Hash: {transaction_hash}\n"
+                        f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash} )\n"
                         f"🔗 Block Number: {block_number}"
                     )
                     await notify_channel(message)
@@ -109,13 +112,5 @@ async def poll_ethereum_events():
 
         await asyncio.sleep(SLEEP_TIME)
 
-
-
-@client.event
-async def on_ready():
-    print(f"Logged in as {client.user}")
-    client.loop.create_task(poll_ethereum_events())  # Start polling the Ethereum events
-
-
-# Run the bot
-client.run(DISCORD_TOKEN)
+if __name__ == "__main__":
+    asyncio.run(poll_ethereum_events())
