@@ -21,7 +21,7 @@ DEPOSIT_TOPIC = "0xdcbc1c05240f31ff3ad067ef1ee35ce4997762752e3a095284754544f4c70
 WITHDRAW_TOPIC = "0xfbde797d201c681b91056529119e0b02407c7bb96a4a2c75c01fc9667232c8db"
 MINIPOOL_CREATED_TOPIC = "0x08b4b91bafaf992145c5dd7e098dfcdb32f879714c154c651c2758a44c7aeae4"
 
-SLEEP_TIME = int(os.getenv("SLEEP_TIME", 10))  # Polling interval in seconds
+SLEEP_TIME = int(os.getenv("SLEEP_TIME", 5))  # Polling interval in seconds
 last_block = int(os.getenv("LAST_BLOCK", 21024052))  # Starting block
 
 intents = discord.Intents.default()
@@ -38,7 +38,6 @@ async def notify_channel(message):
 # - New deposits and withdrawals from the WETH and RPL vaults
 # - New minipools created by supernodes
 async def poll_ethereum_events():
-    # Start at when Constellation was deployed (-10 blocks to be safe)
     global last_block
 
     while True:
@@ -56,7 +55,13 @@ async def poll_ethereum_events():
                 "id": 1
             }
 
+            # Block doesn't exist yet so just print error and retry
             response = requests.post(ALCHEMY_URL, json=params).json()
+            if 'result' not in response:
+                print(f"Unexpected response format: {response}")
+                await asyncio.sleep(SLEEP_TIME)
+                continue
+
             logs = response.get("result", [])
 
             for log in logs:
