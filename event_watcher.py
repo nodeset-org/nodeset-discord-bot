@@ -1,7 +1,6 @@
 import os
 from dotenv import load_dotenv
 
-import discord
 import requests
 import asyncio
 
@@ -21,6 +20,7 @@ WITHDRAW_TOPIC = "0xfbde797d201c681b91056529119e0b02407c7bb96a4a2c75c01fc9667232
 MINIPOOL_CREATED_TOPIC = "0x08b4b91bafaf992145c5dd7e098dfcdb32f879714c154c651c2758a44c7aeae4"
 
 SLEEP_TIME = int(os.getenv("SLEEP_TIME", 5))  # Polling interval in seconds
+
 last_block = int(os.getenv("LAST_BLOCK", 21024052))  # Starting block
 
 
@@ -70,6 +70,27 @@ async def poll_ethereum_events():
                 block_number = int(log["blockNumber"], 16)  # Convert block number from hex to int
                 transaction_hash = log["transactionHash"]
 
+                block_response = requests.post(
+                    ALCHEMY_URL,
+                    json={
+                        "jsonrpc": "2.0",
+                        "method": "eth_getBlockByNumber",
+                        "params": [hex(block_number), False],
+                        "id": 1
+                    }
+                ).json()
+                block_data = block_response.get("result")
+
+                if block_data:
+                    timestamp_hex = block_data["timestamp"]
+                    timestamp = int(timestamp_hex, 16)  # Convert hex timestamp to int
+                    # Discord's Relative Timestamp format: <t:TIMESTAMP:R>
+                    relative_timestamp = f"<t:{timestamp}:R>"
+                else:
+                    print(f"Could not retrieve block data for block number: {block_number}")
+                    continue  # Skip this log if block data is unavailable
+
+
                 # Only handle logs from relevant addresses
                 if address not in {WETH_VAULT_ADDRESS.lower(), RPL_VAULT_ADDRESS.lower(), SUPERNODE_ACCOUNT_ADDRESS.lower()}:
                     continue
@@ -87,20 +108,22 @@ async def poll_ethereum_events():
                 if topic == DEPOSIT_TOPIC:
                     title =  f"**New Deposit**"
                     message = (
-                        f"🚀 Amount: {assets_value:.2f} {asset_type}\n"
+                        f"🚀 Amount: **{assets_value:.2f} {asset_type}**\n"
                         f"📍 Address: [{address}](http://etherscan.io/{address})\n"
                         f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash})\n"
-                        f"🔗 Block Number: {block_number}"
+                        f"🔗 Block Number: {block_number}\n"
+                        f"⏰ Time: {relative_timestamp}\n"
                     )
                     await notify_channel(title, message)
 
                 elif topic == WITHDRAW_TOPIC:
                     title = f"**New Withdrawal**"
                     message = (
-                        f"💸 Amount: {assets_value:.2f} {asset_type}\n"
+                        f"💸 Amount: **{assets_value:.2f} {asset_type}**\n"
                         f"📍 Address: [{address}](http://etherscan.io/{address})\n"
                         f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash})\n"
                         f"🔗 Block Number: {block_number}\n"
+                        f"⏰ Time: {relative_timestamp}\n"
                     )
                     await notify_channel(title, message)
 
@@ -111,7 +134,8 @@ async def poll_ethereum_events():
                         f"🌊 Minipool Address: [{minipool_address}](http://etherscan.io/{minipool_address})\n"
                         f"📍 Address: [{address}](http://etherscan.io/{address})\n"
                         f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash} )\n"
-                        f"🔗 Block Number: {block_number}"
+                        f"🔗 Block Number: {block_number}\n"
+                        f"⏰ Time: {relative_timestamp}\n"
                     )
                     await notify_channel(title, message)
 
