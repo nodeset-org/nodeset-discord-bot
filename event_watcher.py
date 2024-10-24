@@ -7,7 +7,6 @@ import asyncio
 
 load_dotenv()
 
-
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 ALCHEMY_API_KEY = os.getenv("ALCHEMY_API_KEY")
 
@@ -24,12 +23,13 @@ MINIPOOL_CREATED_TOPIC = "0x08b4b91bafaf992145c5dd7e098dfcdb32f879714c154c651c27
 SLEEP_TIME = int(os.getenv("SLEEP_TIME", 5))  # Polling interval in seconds
 last_block = int(os.getenv("LAST_BLOCK", 21024052))  # Starting block
 
-intents = discord.Intents.default()
-client = discord.Client(intents=intents)
 
-async def notify_channel(message):
+async def notify_channel(title, message):
     payload = {
-        "content": message,
+        "embeds":[{
+            "title": title,
+            "description": message,
+        }]
     }
     requests.post(DISCORD_WEBHOOK_URL, json=payload)
 
@@ -85,29 +85,35 @@ async def poll_ethereum_events():
 
                 # Notify discord channel
                 if topic == DEPOSIT_TOPIC:
+                    title =  f"**New Deposit**"
                     message = (
-                        f"🚀 **New Deposit** of {assets_value:.2f} {asset_type} at {address}\n"
+                        f"🚀 Amount: {assets_value:.2f} {asset_type}\n"
+                        f"📍 Address: [{address}](http://etherscan.io/{address})\n"
                         f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash})\n"
                         f"🔗 Block Number: {block_number}"
                     )
-                    await notify_channel(message)
+                    await notify_channel(title, message)
 
                 elif topic == WITHDRAW_TOPIC:
+                    title = f"**New Withdrawal**"
                     message = (
-                        f"💸 **New Withdrawal** of {assets_value:.2f} {asset_type} from {address}\n"
+                        f"💸 Amount: {assets_value:.2f} {asset_type}\n"
+                        f"📍 Address: [{address}](http://etherscan.io/{address})\n"
                         f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash})\n"
                         f"🔗 Block Number: {block_number}\n"
                     )
-                    await notify_channel(message)
+                    await notify_channel(title, message)
 
                 elif topic == MINIPOOL_CREATED_TOPIC:
                     minipool_address = f"0x{log['topics'][1][26:]}"
+                    title = f"**New Minipool**\n"
                     message = (
-                        f"🎉 **New Minipool Created** at {minipool_address}\n"
+                        f"🌊 Minipool Address: [{minipool_address}](http://etherscan.io/{minipool_address})\n"
+                        f"📍 Address: [{address}](http://etherscan.io/{address})\n"
                         f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash} )\n"
                         f"🔗 Block Number: {block_number}"
                     )
-                    await notify_channel(message)
+                    await notify_channel(title, message)
 
             # Move to the next block
             last_block += 1
