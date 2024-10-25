@@ -91,7 +91,7 @@ async def poll_ethereum_events():
 
 
                 # Only handle logs from relevant addresses for transfers
-                if topic in {WETH_VAULT_ADDRESS, RPL_VAULT_ADDRESS} and address not in {WETH_VAULT_ADDRESS.lower(), RPL_VAULT_ADDRESS.lower()}:
+                if topic in {DEPOSIT_TOPIC, WITHDRAW_TOPIC} and address not in {WETH_VAULT_ADDRESS.lower(), RPL_VAULT_ADDRESS.lower()}:
                     continue
 
                 event_data = log["data"]
