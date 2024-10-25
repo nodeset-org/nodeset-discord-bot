@@ -63,7 +63,6 @@ async def poll_ethereum_events():
                 continue
 
             logs = response.get("result", [])
-            print("LOGS", logs)
             for log in logs:
                 address = log["address"].lower()
                 topic = log["topics"][0]
@@ -103,7 +102,6 @@ async def poll_ethereum_events():
                 # shares_value = raw_shares / 10**18
 
                 asset_type = "ETH" if address == WETH_VAULT_ADDRESS.lower() else "RPL"
-                print("!!!", topic)
                 # Notify discord channel
                 if topic == DEPOSIT_TOPIC:
                     title =  f"**New Deposit**"
