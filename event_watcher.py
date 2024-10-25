@@ -11,7 +11,7 @@ ALCHEMY_API_KEY = os.getenv("ALCHEMY_API_KEY")
 
 WETH_VAULT_ADDRESS = "0xBB22d59B73D7a6F3A8a83A214BECc67Eb3b511fE"
 RPL_VAULT_ADDRESS = "0x1DB1Afd9552eeB28e2e36597082440598B7F1320"
-SUPERNODE_ACCOUNT_ADDRESS = "0x2A906f92B0378Bb19a3619E2751b1e0b8cab6B29"
+# SUPERNODE_ACCOUNT_ADDRESS = "0x2A906f92B0378Bb19a3619E2751b1e0b8cab6B29"
 
 ALCHEMY_URL = f"https://eth-mainnet.alchemyapi.io/v2/{ALCHEMY_API_KEY}"
 
@@ -63,7 +63,7 @@ async def poll_ethereum_events():
                 continue
 
             logs = response.get("result", [])
-
+            print("LOGS", logs)
             for log in logs:
                 address = log["address"].lower()
                 topic = log["topics"][0]
@@ -91,8 +91,8 @@ async def poll_ethereum_events():
                     continue  # Skip this log if block data is unavailable
 
 
-                # Only handle logs from relevant addresses
-                if address not in {WETH_VAULT_ADDRESS.lower(), RPL_VAULT_ADDRESS.lower(), SUPERNODE_ACCOUNT_ADDRESS.lower()}:
+                # Only handle logs from relevant addresses for transfers
+                if topic in {WETH_VAULT_ADDRESS, RPL_VAULT_ADDRESS} and address not in {WETH_VAULT_ADDRESS.lower(), RPL_VAULT_ADDRESS.lower()}:
                     continue
 
                 event_data = log["data"]
@@ -103,13 +103,13 @@ async def poll_ethereum_events():
                 # shares_value = raw_shares / 10**18
 
                 asset_type = "ETH" if address == WETH_VAULT_ADDRESS.lower() else "RPL"
-
+                print("!!!", topic)
                 # Notify discord channel
                 if topic == DEPOSIT_TOPIC:
                     title =  f"**New Deposit**"
                     message = (
                         f"🚀 Amount: **{assets_value:.2f} {asset_type}**\n"
-                        f"📍 Address: [{address}](http://etherscan.io/{address})\n"
+                        f"📍 Address: [{address}](http://etherscan.io/address/{address})\n"
                         f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash})\n"
                         f"🔗 Block Number: {block_number}\n"
                         f"⏰ Time: {relative_timestamp}\n"
@@ -120,7 +120,7 @@ async def poll_ethereum_events():
                     title = f"**New Withdrawal**"
                     message = (
                         f"💸 Amount: **{assets_value:.2f} {asset_type}**\n"
-                        f"📍 Address: [{address}](http://etherscan.io/{address})\n"
+                        f"📍 Address: [{address}](http://etherscan.io/address/{address})\n"
                         f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash})\n"
                         f"🔗 Block Number: {block_number}\n"
                         f"⏰ Time: {relative_timestamp}\n"
@@ -131,9 +131,9 @@ async def poll_ethereum_events():
                     minipool_address = f"0x{log['topics'][1][26:]}"
                     title = f"**New Minipool**\n"
                     message = (
-                        f"🌊 Minipool Address: [{minipool_address}](http://etherscan.io/{minipool_address})\n"
-                        f"📍 Address: [{address}](http://etherscan.io/{address})\n"
-                        f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash} )\n"
+                        f"🌊 Minipool Address: [{minipool_address}](http://etherscan.io/address/{minipool_address})\n"
+                        # f"📍 Address: [{address}](http://etherscan.io/address/{address})\n"
+                        f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash})\n"
                         f"🔗 Block Number: {block_number}\n"
                         f"⏰ Time: {relative_timestamp}\n"
                     )
