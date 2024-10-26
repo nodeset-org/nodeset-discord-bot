@@ -11,7 +11,7 @@ ALCHEMY_API_KEY = os.getenv("ALCHEMY_API_KEY")
 
 WETH_VAULT_ADDRESS = "0xBB22d59B73D7a6F3A8a83A214BECc67Eb3b511fE"
 RPL_VAULT_ADDRESS = "0x1DB1Afd9552eeB28e2e36597082440598B7F1320"
-# SUPERNODE_ACCOUNT_ADDRESS = "0x2A906f92B0378Bb19a3619E2751b1e0b8cab6B29"
+SUPERNODE_ACCOUNT_ADDRESS = "0x2A906f92B0378Bb19a3619E2751b1e0b8cab6B29"
 
 ALCHEMY_URL = f"https://eth-mainnet.alchemyapi.io/v2/{ALCHEMY_API_KEY}"
 
@@ -92,6 +92,10 @@ async def poll_ethereum_events():
 
                 # Only handle logs from relevant addresses for transfers
                 if topic in {DEPOSIT_TOPIC, WITHDRAW_TOPIC} and address not in {WETH_VAULT_ADDRESS.lower(), RPL_VAULT_ADDRESS.lower()}:
+                    continue
+
+                # Only handle logs from relevant addresses for minipool creation
+                if topic == MINIPOOL_CREATED_TOPIC and address != SUPERNODE_ACCOUNT_ADDRESS.lower():
                     continue
 
                 event_data = log["data"]
