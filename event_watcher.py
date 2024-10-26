@@ -105,9 +105,10 @@ async def poll_ethereum_events():
                 # Notify discord channel
                 if topic == DEPOSIT_TOPIC:
                     title =  f"**New Deposit**"
+                    sender_address = log["topics"][1]
                     message = (
                         f"🚀 Amount: **{assets_value:.2f} {asset_type}**\n"
-                        f"📍 Address: [{address}](http://etherscan.io/address/{address})\n"
+                        f"📍 Address: [{sender_address}](http://etherscan.io/address/{sender_address})\n"
                         f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash})\n"
                         f"🔗 Block Number: {block_number}\n"
                         f"⏰ Time: {relative_timestamp}\n"
@@ -116,9 +117,10 @@ async def poll_ethereum_events():
 
                 elif topic == WITHDRAW_TOPIC:
                     title = f"**New Withdrawal**"
+                    sender_address = log["topics"][2]
                     message = (
                         f"💸 Amount: **{assets_value:.2f} {asset_type}**\n"
-                        f"📍 Address: [{address}](http://etherscan.io/address/{address})\n"
+                        f"📍 Address: [{sender_address}](http://etherscan.io/address/{sender_address})\n"
                         f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash})\n"
                         f"🔗 Block Number: {block_number}\n"
                         f"⏰ Time: {relative_timestamp}\n"
