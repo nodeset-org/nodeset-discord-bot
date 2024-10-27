@@ -91,11 +91,13 @@ async def poll_ethereum_events():
 
 
                 # Only handle logs from relevant addresses for transfers
+
                 if topic in {DEPOSIT_TOPIC, WITHDRAW_TOPIC} and address not in {WETH_VAULT_ADDRESS.lower(), RPL_VAULT_ADDRESS.lower()}:
                     continue
 
+                formatted_contract_address= f"0x{int(log['topics'][2], 16):040x}"
                 # Only handle logs from relevant addresses for minipool creation
-                if topic == MINIPOOL_CREATED_TOPIC and address != SUPERNODE_ACCOUNT_ADDRESS.lower():
+                if topic == MINIPOOL_CREATED_TOPIC and  formatted_contract_address != SUPERNODE_ACCOUNT_ADDRESS.lower():
                     continue
 
                 event_data = log["data"]
