@@ -100,3 +100,23 @@ def test_fetch_logs_success(mock_post):
             "id": 1
         }
     )
+
+def test_process_log_no_block_data():
+    """Test process_log when block data is missing"""
+    pass
+
+def test_process_log_no_valid_topic():
+    """Test process_log when the log has no valid topic"""
+    pass
+
+def test_process_log_success_deposit_topic():
+    """Test process_log when the log has a deposit topic"""
+    pass
+
+def test_process_log_success_withdraw_topic():
+    """Test process_log when the log has a withdraw topic"""
+    pass
+
+def test_process_log_success_minipool_topic():
+    """Test process_log when the log has a minipool topic"""
+    pass
