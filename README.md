@@ -27,4 +27,8 @@ cp .env.default .env
 python3 event_watcher.py
 ```
 
-## Deploy to Railway
+## Running tests
+
+```
+python3 -m pytest tests/
+```

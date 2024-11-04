@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 
 import requests
-import asyncio
+import time
 
 load_dotenv()
 
@@ -24,9 +24,9 @@ SLEEP_TIME = int(os.getenv("SLEEP_TIME", 5))  # Polling interval in seconds
 last_block = int(os.getenv("LAST_BLOCK", 21024052))  # Starting block
 
 
-async def notify_channel(title, message):
+def notify_channel(title, message):
     payload = {
-        "embeds":[{
+        "embeds": [{
             "title": title,
             "description": message,
         }]
@@ -37,7 +37,7 @@ async def notify_channel(title, message):
 # Poll for:
 # - New deposits and withdrawals from the WETH and RPL vaults
 # - New minipools created by supernodes
-async def poll_ethereum_events():
+def poll_ethereum_events():
     global last_block
 
     while True:
@@ -59,7 +59,7 @@ async def poll_ethereum_events():
             response = requests.post(ALCHEMY_URL, json=params).json()
             if 'result' not in response:
                 print(f"Unexpected response format: {response}")
-                await asyncio.sleep(SLEEP_TIME)
+                time.sleep(SLEEP_TIME)
                 continue
 
             logs = response.get("result", [])
@@ -120,7 +120,7 @@ async def poll_ethereum_events():
                         f"🔗 Block Number: {block_number}\n"
                         f"⏰ Time: {relative_timestamp}\n"
                     )
-                    await notify_channel(title, message)
+                    notify_channel(title, message)
 
                 elif topic == WITHDRAW_TOPIC:
                     title = f"**New Withdrawal**"
@@ -133,7 +133,7 @@ async def poll_ethereum_events():
                         f"🔗 Block Number: {block_number}\n"
                         f"⏰ Time: {relative_timestamp}\n"
                     )
-                    await notify_channel(title, message)
+                    notify_channel(title, message)
 
                 elif topic == MINIPOOL_CREATED_TOPIC:
                     minipool_address = f"0x{log['topics'][1][26:]}"
@@ -145,7 +145,7 @@ async def poll_ethereum_events():
                         f"🔗 Block Number: {block_number}\n"
                         f"⏰ Time: {relative_timestamp}\n"
                     )
-                    await notify_channel(title, message)
+                    notify_channel(title, message)
 
             # Move to the next block
             last_block += 1
@@ -153,7 +153,7 @@ async def poll_ethereum_events():
         except Exception as e:
             print(f"Error fetching logs: {e}")
 
-        await asyncio.sleep(SLEEP_TIME)
+        time.sleep(SLEEP_TIME)
 
 if __name__ == "__main__":
-    asyncio.run(poll_ethereum_events())
+    poll_ethereum_events()
