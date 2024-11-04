@@ -69,6 +69,7 @@ class EventWatcher:
 
     def process_log(self, log):
         """Process a single log entry."""
+        print(f"Processing log: {log}")
         address = log["address"].lower()
         topic = log["topics"][0]
         block_number = int(log["blockNumber"], 16)
