@@ -24,136 +24,119 @@ SLEEP_TIME = int(os.getenv("SLEEP_TIME", 5))  # Polling interval in seconds
 last_block = int(os.getenv("LAST_BLOCK", 21024052))  # Starting block
 
 
-def notify_channel(title, message):
-    payload = {
-        "embeds": [{
-            "title": title,
-            "description": message,
-        }]
-    }
-    requests.post(DISCORD_WEBHOOK_URL, json=payload)
+class EventWatcher:
+    def __init__(self, webhook_url):
+        self.webhook_url = webhook_url
 
+    def notify_channel(self, title, message):
+        """Send a message to the Discord channel."""
+        payload = {
+            "embeds": [{
+                "title": title,
+                "description": message,
+            }]
+        }
+        requests.post(DISCORD_WEBHOOK_URL, json=payload)
 
-# Poll for:
-# - New deposits and withdrawals from the WETH and RPL vaults
-# - New minipools created by supernodes
-def poll_ethereum_events():
-    global last_block
-
-    while True:
-        print(f"Processing block: {last_block}")
-
-        try:
-            params = {
+    def get_block_data(self, block_number):
+        """Get block data from the blockchain via Alchemy."""
+        response = requests.post(
+            ALCHEMY_URL,
+            json={
                 "jsonrpc": "2.0",
-                "method": "eth_getLogs",
-                "params": [{
-                    "fromBlock": hex(last_block),
-                    "toBlock": hex(last_block),
-                    "topics": [[DEPOSIT_TOPIC, WITHDRAW_TOPIC, MINIPOOL_CREATED_TOPIC]]
-                }],
+                "method": "eth_getBlockByNumber",
+                "params": [hex(block_number), False],
                 "id": 1
             }
+        ).json()
+        return response.get("result")
 
-            # Block doesn't exist yet so just print error and retry
-            response = requests.post(ALCHEMY_URL, json=params).json()
-            if 'result' not in response:
-                print(f"Unexpected response format: {response}")
-                time.sleep(SLEEP_TIME)
-                continue
-
-            logs = response.get("result", [])
-            for log in logs:
-                address = log["address"].lower()
-                topic = log["topics"][0]
-                block_number = int(log["blockNumber"], 16)  # Convert block number from hex to int
-                transaction_hash = log["transactionHash"]
-
-                block_response = requests.post(
-                    ALCHEMY_URL,
-                    json={
-                        "jsonrpc": "2.0",
-                        "method": "eth_getBlockByNumber",
-                        "params": [hex(block_number), False],
-                        "id": 1
-                    }
-                ).json()
-                block_data = block_response.get("result")
-
-                if block_data:
-                    timestamp_hex = block_data["timestamp"]
-                    timestamp = int(timestamp_hex, 16)  # Convert hex timestamp to int
-                    # Discord's Relative Timestamp format: <t:TIMESTAMP:R>
-                    relative_timestamp = f"<t:{timestamp}:R>"
-                else:
-                    print(f"Could not retrieve block data for block number: {block_number}")
-                    continue  # Skip this log if block data is unavailable
+    def fetch_logs(self, block):
+        """Fetch logs for a specific block."""
+        params = {
+            "jsonrpc": "2.0",
+            "method": "eth_getLogs",
+            "params": [{
+                "fromBlock": hex(block),
+                "toBlock": hex(block),
+                "topics": [[DEPOSIT_TOPIC, WITHDRAW_TOPIC, MINIPOOL_CREATED_TOPIC]]
+            }],
+            "id": 1
+        }
+        response = requests.post(ALCHEMY_URL, json=params).json()
+        return response.get("result", [])
 
 
-                # Only handle logs from relevant addresses for transfers
+    def process_log(self, log):
+        """Process a single log entry."""
+        address = log["address"].lower()
+        topic = log["topics"][0]
+        block_number = int(log["blockNumber"], 16)
+        transaction_hash = log["transactionHash"]
 
-                if topic in {DEPOSIT_TOPIC, WITHDRAW_TOPIC} and address not in {WETH_VAULT_ADDRESS.lower(), RPL_VAULT_ADDRESS.lower()}:
-                    continue
+        block_data = self.get_block_data(block_number)
+        if not block_data:
+            print(f"Could not retrieve block data for block number: {block_number}")
+            return
 
-                formatted_contract_address= f"0x{int(log['topics'][2], 16):040x}"
-                # Only handle logs from relevant addresses for minipool creation
-                if topic == MINIPOOL_CREATED_TOPIC and  formatted_contract_address != SUPERNODE_ACCOUNT_ADDRESS.lower():
-                    continue
+        timestamp = int(block_data["timestamp"], 16)
+        relative_timestamp = f"<t:{timestamp}:R>"
 
-                event_data = log["data"]
-                raw_assets = int(event_data[2:66], 16)  # First 32 bytes for assets
-                # raw_shares = int(event_data[66:], 16)   # Next 32 bytes for shares
+        if topic in {DEPOSIT_TOPIC, WITHDRAW_TOPIC} and address not in {WETH_VAULT_ADDRESS.lower(), RPL_VAULT_ADDRESS.lower()}:
+            return  # Ignore irrelevant logs
 
-                assets_value = raw_assets / 10**18
-                # shares_value = raw_shares / 10**18
+        event_data = log["data"]
+        raw_assets = int(event_data[2:66], 16)  # First 32 bytes for assets
+        assets_value = raw_assets / 10**18
 
-                asset_type = "ETH" if address == WETH_VAULT_ADDRESS.lower() else "RPL"
-                # Notify discord channel
-                if topic == DEPOSIT_TOPIC:
-                    title =  f"**New Deposit**"
-                    sender_address = log["topics"][1]
-                    formatted_address = f"0x{int(sender_address, 16):040x}"
-                    message = (
-                        f"🚀 Amount: **{assets_value:.2f} {asset_type}**\n"
-                        f"📍 Address: [{formatted_address}](http://etherscan.io/address/{formatted_address})\n"
-                        f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash})\n"
-                        f"🔗 Block Number: {block_number}\n"
-                        f"⏰ Time: {relative_timestamp}\n"
-                    )
-                    notify_channel(title, message)
+        formatted_address = f"0x{int(log['topics'][1], 16):040x}"  # Sender address
 
-                elif topic == WITHDRAW_TOPIC:
-                    title = f"**New Withdrawal**"
-                    sender_address = log["topics"][2]
-                    formatted_address = f"0x{int(sender_address, 16):040x}"
-                    message = (
-                        f"💸 Amount: **{assets_value:.2f} {asset_type}**\n"
-                        f"📍 Address: [{formatted_address}](http://etherscan.io/address/{formatted_address})\n"
-                        f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash})\n"
-                        f"🔗 Block Number: {block_number}\n"
-                        f"⏰ Time: {relative_timestamp}\n"
-                    )
-                    notify_channel(title, message)
+        if topic == DEPOSIT_TOPIC:
+            title =  f"**New Deposit**"
+            message = (f"🚀 Amount: **{assets_value:.2f}**\n"
+                       f"📍 Address: [{formatted_address}](http://etherscan.io/address/{formatted_address})\n"
+                       f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash})\n"
+                       f"🔗 Block Number: {block_number}\n"
+                       f"⏰ Time: {relative_timestamp}\n")
+            self.notify_channel(title, message)
 
-                elif topic == MINIPOOL_CREATED_TOPIC:
-                    minipool_address = f"0x{log['topics'][1][26:]}"
-                    title = f"**New Minipool**\n"
-                    message = (
-                        f"🌊 Minipool Address: [{minipool_address}](http://etherscan.io/address/{minipool_address})\n"
-                        # f"📍 Address: [{address}](http://etherscan.io/address/{address})\n"
-                        f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash})\n"
-                        f"🔗 Block Number: {block_number}\n"
-                        f"⏰ Time: {relative_timestamp}\n"
-                    )
-                    notify_channel(title, message)
+        elif topic == WITHDRAW_TOPIC:
+            title = f"**New Withdrawal**"
+            message = (f"💸 Amount: **{assets_value:.2f}**\n"
+                       f"📍 Address: [{formatted_address}](http://etherscan.io/address/{formatted_address})\n"
+                       f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash})\n"
+                       f"🔗 Block Number: {block_number}\n"
+                       f"⏰ Time: {relative_timestamp}\n")
+            self.notify_channel(title, message)
 
-            # Move to the next block
-            last_block += 1
+        elif topic == MINIPOOL_CREATED_TOPIC:
+            minipool_address = f"0x{log['topics'][1][26:]}"
+            title = f"**New Minipool**"
+            message = (f"🌊 Minipool Address: [{minipool_address}](http://etherscan.io/address/{minipool_address})\n"
+                       f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash})\n"
+                       f"🔗 Block Number: {block_number}\n"
+                       f"⏰ Time: {relative_timestamp}\n")
+            self.notify_channel(title, message)
 
-        except Exception as e:
-            print(f"Error fetching logs: {e}")
 
-        time.sleep(SLEEP_TIME)
+    def run(self):
+        """Start the process for monitoring and processing events to Discord."""
+        global last_block
+
+        while True:
+            print(f"Processing block: {last_block}")
+
+            try:
+                logs = self.fetch_logs(last_block)
+                for log in logs:
+                    self.process_log(log)
+                # Move to the next block
+                last_block += 1
+
+            except Exception as e:
+                print(f"Error processing block: {e}")
+            time.sleep(SLEEP_TIME)
 
 if __name__ == "__main__":
-    poll_ethereum_events()
+    watcher = EventWatcher(DISCORD_WEBHOOK_URL)
+    watcher.run()
