@@ -2,7 +2,8 @@ import os
 import requests
 import time
 from dotenv import load_dotenv
-from datetime import datetime, timedelta
+from datetime import datetime
+import pytz
 
 load_dotenv()
 
@@ -64,9 +65,12 @@ class MonitorOracle:
 
                 # Check if the last updated time is older than ORACLE_TIME_THRESHOLD
                 if time_difference > ORACLE_TIME_THRESHOLD:
+                    last_updated_datetime = datetime.fromtimestamp(last_updated, pytz.timezone('America/Los_Angeles'))
+                    formatted_timestamp = last_updated_datetime.strftime('%B %d, %Y at %I:%M %p PST')
                     alert_message = (
-                        f"The Oracle at {ORACLE_CONTRACT_ADDRESS} is out of date."
-                        f"\nLast updated timestamp: {datetime.fromtimestamp(last_updated).isoformat()}"
+                        f"The Oracle is out of date."
+                        f"\nLast updated at: {formatted_timestamp}"
+
                     )
                     self.send_discord_alert(alert_message)
             time.sleep(60 * 60)  # Check once every hour
