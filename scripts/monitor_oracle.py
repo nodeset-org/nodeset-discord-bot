@@ -64,7 +64,7 @@ class MonitorOracle:
                 print(f"{time_difference:.2f} hours since last updated.")
 
                 # Check if the last updated time is older than ORACLE_TIME_THRESHOLD
-                if time_difference > ORACLE_TIME_THRESHOLD:
+                if time_difference > float(ORACLE_TIME_THRESHOLD):
                     last_updated_datetime = datetime.fromtimestamp(last_updated, pytz.timezone('America/Los_Angeles'))
                     formatted_timestamp = last_updated_datetime.strftime('%B %d, %Y at %I:%M %p PST')
                     alert_message = (
