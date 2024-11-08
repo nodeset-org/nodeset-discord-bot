@@ -36,7 +36,7 @@ class EventWatcher:
                 "description": message,
             }]
         }
-        requests.post(DISCORD_WEBHOOK_URL, json=payload)
+        requests.post(self.webhook_url, json=payload)
 
     def get_block_data(self, block_number):
         """Get block data from the blockchain via Alchemy."""
