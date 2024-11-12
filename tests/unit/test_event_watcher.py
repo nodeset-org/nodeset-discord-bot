@@ -1,6 +1,6 @@
 import os
 from unittest.mock import patch
-from event_watcher import EventWatcher, DEPOSIT_TOPIC, WITHDRAW_TOPIC, MINIPOOL_CREATED_TOPIC
+from scripts.event_watcher import EventWatcher, DEPOSIT_TOPIC, WITHDRAW_TOPIC, MINIPOOL_CREATED_TOPIC
 from dotenv import load_dotenv
 
 load_dotenv(dotenv_path='.env.test')
