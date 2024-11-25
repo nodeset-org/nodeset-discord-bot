@@ -18,6 +18,7 @@ ALCHEMY_URL = f"https://eth-mainnet.alchemyapi.io/v2/{ALCHEMY_API_KEY}"
 DEPOSIT_TOPIC = "0xdcbc1c05240f31ff3ad067ef1ee35ce4997762752e3a095284754544f4c709d7"
 WITHDRAW_TOPIC = "0xfbde797d201c681b91056529119e0b02407c7bb96a4a2c75c01fc9667232c8db"
 MINIPOOL_CREATED_TOPIC = "0x08b4b91bafaf992145c5dd7e098dfcdb32f879714c154c651c2758a44c7aeae4"
+SWAP_TOPIC = "0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67"
 
 SLEEP_TIME = int(os.getenv("SLEEP_TIME", 5))  # Polling interval in seconds
 
@@ -36,7 +37,7 @@ class EventWatcher:
                 "description": message,
             }]
         }
-        requests.post(DISCORD_WEBHOOK_URL, json=payload)
+        requests.post(self.webhook_url, json=payload)
 
     def get_block_data(self, block_number):
         """Get block data from the blockchain via Alchemy."""
@@ -66,10 +67,33 @@ class EventWatcher:
         response = requests.post(ALCHEMY_URL, json=params).json()
         return response.get("result", [])
 
+    def fetch_transaction_logs(self, tx_hash):
+        """Fetch logs for a specific transaction"""
+        response = requests.post(
+            ALCHEMY_URL,
+            json={
+                "jsonrpc": "2.0",
+                "method": "eth_getTransactionReceipt",
+                "params": [tx_hash],
+                "id": 1
+            }
+        ).json()
+
+        receipt = response.get("result")
+        if receipt and "logs" in receipt:
+            return receipt["logs"]
+        else:
+            print(f"No logs found for transaction {tx_hash}")
+            return []
+
+    def extract_topics_from_logs(self, logs):
+        """Extract topics from logs."""
+        topics_list = list(set([topic for log in logs for topic in log['topics']]))
+        return topics_list
+
 
     def process_log(self, log):
         """Process a single log entry."""
-        print(f"Processing log: {log}")
         address = log["address"].lower()
         topic = log["topics"][0]
         block_number = int(log["blockNumber"], 16)
@@ -91,6 +115,19 @@ class EventWatcher:
         assets_value = raw_assets / 10**18
 
         formatted_address = f"0x{int(log['topics'][1], 16):040x}"  # Sender address
+
+        fetched_logs = self.fetch_transaction_logs(log["transactionHash"])
+        extracted_topics = self.extract_topics_from_logs(fetched_logs)
+
+        if SWAP_TOPIC in extracted_topics:
+            title = f"**Likely Automatic Arbitrage**"
+            message = (f"🤖 Amount: **{assets_value:.2f}**\n"
+                       f"📍 Address: [{formatted_address}](http://etherscan.io/address/{formatted_address})\n"
+                       f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash})\n"
+                       f"🔗 Block Number: {block_number}\n"
+                       f"⏰ Time: {relative_timestamp}\n")
+            self.notify_channel(title, message)
+            return
 
         if topic == DEPOSIT_TOPIC:
             title =  f"**New Deposit**"
