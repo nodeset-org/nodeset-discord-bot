@@ -37,6 +37,8 @@ class EventWatcher:
                 "description": message,
             }]
         }
+        print("Notifying channel:")
+        print(payload)
         requests.post(self.webhook_url, json=payload)
 
     def get_block_data(self, block_number):
@@ -67,7 +69,7 @@ class EventWatcher:
         response = requests.post(ALCHEMY_URL, json=params).json()
         return response.get("result", [])
 
-    def fetch_transaction_logs(self, tx_hash):
+    def fetch_transaction_receipt(self, tx_hash):
         """Fetch logs for a specific transaction"""
         response = requests.post(
             ALCHEMY_URL,
@@ -81,10 +83,10 @@ class EventWatcher:
 
         receipt = response.get("result")
         if receipt and "logs" in receipt:
-            return receipt["logs"]
+            return receipt
         else:
-            print(f"No logs found for transaction {tx_hash}")
-            return []
+            print(f"No receipt found for transaction {tx_hash}")
+            return {}
 
     def extract_topics_from_logs(self, logs):
         """Extract topics from logs."""
@@ -94,16 +96,14 @@ class EventWatcher:
 
     def process_log(self, log):
         """Process a single log entry."""
-        address = log["address"].lower()
+        address = log["address"].lower() # Sender address
         topic = log["topics"][0]
         block_number = int(log["blockNumber"], 16)
         transaction_hash = log["transactionHash"]
-
         block_data = self.get_block_data(block_number)
         if not block_data:
             print(f"Could not retrieve block data for block number: {block_number}")
             return
-
         timestamp = int(block_data["timestamp"], 16)
         relative_timestamp = f"<t:{timestamp}:R>"
 
@@ -116,9 +116,11 @@ class EventWatcher:
 
         formatted_address = f"0x{int(log['topics'][1], 16):040x}"  # Sender address
 
-        fetched_logs = self.fetch_transaction_logs(log["transactionHash"])
+        fetched_receipt = self.fetch_transaction_receipt(log["transactionHash"])
+        if not fetched_receipt:
+            return
+        fetched_logs = fetched_receipt["logs"]
         extracted_topics = self.extract_topics_from_logs(fetched_logs)
-
         if SWAP_TOPIC in extracted_topics:
             title = f"**Likely Automatic Arbitrage**"
             message = (f"🤖 Amount: **{assets_value:.2f}**\n"
@@ -127,6 +129,10 @@ class EventWatcher:
                        f"🔗 Block Number: {block_number}\n"
                        f"⏰ Time: {relative_timestamp}\n")
             self.notify_channel(title, message)
+            return
+
+        # Ignore if to (contract) address is not supernode account
+        if fetched_receipt['to'].lower() != SUPERNODE_ACCOUNT_ADDRESS.lower():
             return
 
         if topic == DEPOSIT_TOPIC:
