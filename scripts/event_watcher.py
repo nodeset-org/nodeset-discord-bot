@@ -132,7 +132,7 @@ class EventWatcher:
             return
 
         # Ignore if to (contract) address is not supernode account
-        if fetched_receipt['to'].lower() != SUPERNODE_ACCOUNT_ADDRESS.lower():
+        if fetched_receipt['to'].lower() not in { SUPERNODE_ACCOUNT_ADDRESS.lower(),WETH_VAULT_ADDRESS.lower(), RPL_VAULT_ADDRESS.lower() }:
             return
 
         if topic == DEPOSIT_TOPIC:
