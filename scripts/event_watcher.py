@@ -94,6 +94,15 @@ class EventWatcher:
         return topics_list
 
 
+    def check_block_exists(self, block_number):
+        """Check if the block exists."""
+        block_data = self.get_block_data(block_number)
+        if not block_data or block_data.get('error'):
+            print(f"Block {block_number} does not exist yet, retrying...")
+            return False
+        return True
+
+
     def process_log(self, log):
         """Process a single log entry."""
         address = log["address"].lower() # Sender address
@@ -171,6 +180,10 @@ class EventWatcher:
             print(f"Processing block: {last_block}")
 
             try:
+                if not self.check_block_exists(last_block):
+                    time.sleep(SLEEP_TIME)
+                    continue
+
                 logs = self.fetch_logs(last_block)
                 for log in logs:
                     self.process_log(log)
