@@ -22,12 +22,13 @@ SWAP_TOPIC = "0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67
 
 SLEEP_TIME = int(os.getenv("SLEEP_TIME", 5))  # Polling interval in seconds
 
-last_block = int(os.getenv("LAST_BLOCK", 21024052))  # Starting block
+LAST_BLOCK = int(os.getenv("LAST_BLOCK", 21024052))  # Starting block
 
 
 class EventWatcher:
-    def __init__(self, webhook_url):
+    def __init__(self, webhook_url, last_block):
         self.webhook_url = webhook_url
+        self.last_block = last_block
 
     def notify_channel(self, title, message):
         """Send a message to the Discord channel."""
@@ -130,23 +131,20 @@ class EventWatcher:
             return
         fetched_logs = fetched_receipt["logs"]
         extracted_topics = self.extract_topics_from_logs(fetched_logs)
-        if SWAP_TOPIC in extracted_topics:
-            title = f"**Likely Automatic Arbitrage**"
-            message = (f"🤖 Amount: **{assets_value:.2f}**\n"
-                       f"📍 Address: [{formatted_address}](http://etherscan.io/address/{formatted_address})\n"
-                       f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash})\n"
-                       f"🔗 Block Number: {block_number}\n"
-                       f"⏰ Time: {relative_timestamp}\n")
-            self.notify_channel(title, message)
-            return
 
         # Ignore if to (contract) address is not supernode account
         if fetched_receipt['to'].lower() not in { SUPERNODE_ACCOUNT_ADDRESS.lower(),WETH_VAULT_ADDRESS.lower(), RPL_VAULT_ADDRESS.lower() }:
             return
 
+        asset_type = "RPL" if fetched_receipt['to'].lower() == RPL_VAULT_ADDRESS.lower() else "ETH"
+
         if topic == DEPOSIT_TOPIC:
-            title =  f"**New Deposit**"
-            message = (f"🚀 Amount: **{assets_value:.2f}**\n"
+            if SWAP_TOPIC in extracted_topics:
+                title =  "**New Deposit (potential arb)**"
+            else:
+                title = "**New Deposit**"
+
+            message = (f"🚀 Amount: **{assets_value:.2f} {asset_type}**\n"
                        f"📍 Address: [{formatted_address}](http://etherscan.io/address/{formatted_address})\n"
                        f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash})\n"
                        f"🔗 Block Number: {block_number}\n"
@@ -154,8 +152,12 @@ class EventWatcher:
             self.notify_channel(title, message)
 
         elif topic == WITHDRAW_TOPIC:
-            title = f"**New Withdrawal**"
-            message = (f"💸 Amount: **{assets_value:.2f}**\n"
+            if SWAP_TOPIC in extracted_topics:
+                title =  "**New Withdrawal (potential arb)**"
+            else:
+                title =  "**New Withdrawal**"
+
+            message = (f"💸 Amount: **{assets_value:.2f} {asset_type}**\n"
                        f"📍 Address: [{formatted_address}](http://etherscan.io/address/{formatted_address})\n"
                        f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash})\n"
                        f"🔗 Block Number: {block_number}\n"
@@ -174,26 +176,24 @@ class EventWatcher:
 
     def run(self):
         """Start the process for monitoring and processing events to Discord."""
-        global last_block
-
         while True:
-            print(f"Processing block: {last_block}")
+            print(f"Processing block: {self.last_block}")
 
             try:
-                if not self.check_block_exists(last_block):
+                if not self.check_block_exists(self.last_block):
                     time.sleep(SLEEP_TIME)
                     continue
 
-                logs = self.fetch_logs(last_block)
+                logs = self.fetch_logs(self.last_block)
                 for log in logs:
                     self.process_log(log)
                 # Move to the next block
-                last_block += 1
+                self.last_block += 1
 
             except Exception as e:
                 print(f"Error processing block: {e}")
             time.sleep(SLEEP_TIME)
 
 if __name__ == "__main__":
-    watcher = EventWatcher(DISCORD_WEBHOOK_URL)
+    watcher = EventWatcher(DISCORD_WEBHOOK_URL, LAST_BLOCK)
     watcher.run()
