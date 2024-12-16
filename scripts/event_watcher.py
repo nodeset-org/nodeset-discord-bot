@@ -131,18 +131,20 @@ class EventWatcher:
         fetched_logs = fetched_receipt["logs"]
         extracted_topics = self.extract_topics_from_logs(fetched_logs)
 
-        asset_type = "ETH"  # Default asset type
-        if fetched_receipt['to'].lower() == RPL_VAULT_ADDRESS.lower():
-            asset_type = "RPL"
-
         if SWAP_TOPIC in extracted_topics:
-            # title = f"**Likely Automatic Arbitrage**"
-            # message = (f"🤖 Amount: **{assets_value:.2f} {asset_type}**\n"
-            #            f"📍 Address: [{formatted_address}](http://etherscan.io/address/{formatted_address})\n"
-            #            f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash})\n"
-            #            f"🔗 Block Number: {block_number}\n"
-            #            f"⏰ Time: {relative_timestamp}\n")
-            # self.notify_channel(title, message)
+            asset_type = "ETH"
+            for log in fetched_logs:
+                if WITHDRAW_TOPIC in log['topics'] and log['address'].lower() == RPL_VAULT_ADDRESS.lower():
+                    asset_type = "RPL"
+                    break
+
+            title = f"**Likely Automatic Arbitrage**"
+            message = (f"🤖 Amount: **{assets_value:.2f} {asset_type}**\n"
+                       f"📍 Address: [{formatted_address}](http://etherscan.io/address/{formatted_address})\n"
+                       f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash})\n"
+                       f"🔗 Block Number: {block_number}\n"
+                       f"⏰ Time: {relative_timestamp}\n")
+            self.notify_channel(title, message)
             return
 
         # Ignore if to (contract) address is not supernode account
@@ -150,6 +152,10 @@ class EventWatcher:
             return
 
         if topic == DEPOSIT_TOPIC:
+            asset_type = "ETH"
+            if fetched_receipt['to'].lower() == RPL_VAULT_ADDRESS.lower():
+                asset_type = "RPL"
+
             title =  f"**New Deposit**"
             message = (f"🚀 Amount: **{assets_value:.2f {asset_type}}**\n"
                        f"📍 Address: [{formatted_address}](http://etherscan.io/address/{formatted_address})\n"
@@ -159,6 +165,10 @@ class EventWatcher:
             self.notify_channel(title, message)
 
         elif topic == WITHDRAW_TOPIC:
+            asset_type = "ETH"
+            if fetched_receipt['to'].lower() == RPL_VAULT_ADDRESS.lower():
+                asset_type = "RPL"
+
             title = f"**New Withdrawal**"
             message = (f"💸 Amount: **{assets_value:.2f} {asset_type}**\n"
                        f"📍 Address: [{formatted_address}](http://etherscan.io/address/{formatted_address})\n"
