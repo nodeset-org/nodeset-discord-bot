@@ -136,9 +136,9 @@ class EventWatcher:
         if fetched_receipt['to'].lower() not in { SUPERNODE_ACCOUNT_ADDRESS.lower(),WETH_VAULT_ADDRESS.lower(), RPL_VAULT_ADDRESS.lower() }:
             return
 
-        if topic == DEPOSIT_TOPIC:
-            asset_type = "RPL" if fetched_receipt['to'].lower() == RPL_VAULT_ADDRESS.lower() else "ETH"
+        asset_type = "RPL" if fetched_receipt['to'].lower() == RPL_VAULT_ADDRESS.lower() else "ETH"
 
+        if topic == DEPOSIT_TOPIC:
             if SWAP_TOPIC in extracted_topics:
                 title =  "**New Deposit (potential arb)**"
             else:
@@ -152,8 +152,6 @@ class EventWatcher:
             self.notify_channel(title, message)
 
         elif topic == WITHDRAW_TOPIC:
-            asset_type = "RPL" if fetched_receipt['to'].lower() == RPL_VAULT_ADDRESS.lower() else "ETH"
-
             if SWAP_TOPIC in extracted_topics:
                 title =  "**New Withdrawal (potential arb)**"
             else:
