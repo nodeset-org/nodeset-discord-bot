@@ -130,9 +130,16 @@ class EventWatcher:
             return
         fetched_logs = fetched_receipt["logs"]
         extracted_topics = self.extract_topics_from_logs(fetched_logs)
+
+        asset_type = "ETH"  # Default asset type
+        if fetched_receipt['to'].lower() == RPL_VAULT_ADDRESS.lower():
+            asset_type = "RPL"
+        elif SWAP_TOPIC in extracted_topics:
+            asset_type = "ETH"  # Assuming ETH for swap-related transactions
+
         if SWAP_TOPIC in extracted_topics:
             title = f"**Likely Automatic Arbitrage**"
-            message = (f"🤖 Amount: **{assets_value:.2f}**\n"
+            message = (f"🤖 Amount: **{assets_value:.2f}** {asset_type}\n"
                        f"📍 Address: [{formatted_address}](http://etherscan.io/address/{formatted_address})\n"
                        f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash})\n"
                        f"🔗 Block Number: {block_number}\n"
@@ -146,7 +153,7 @@ class EventWatcher:
 
         if topic == DEPOSIT_TOPIC:
             title =  f"**New Deposit**"
-            message = (f"🚀 Amount: **{assets_value:.2f}**\n"
+            message = (f"🚀 Amount: **{assets_value:.2f}** {asset_type}\n"
                        f"📍 Address: [{formatted_address}](http://etherscan.io/address/{formatted_address})\n"
                        f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash})\n"
                        f"🔗 Block Number: {block_number}\n"
@@ -155,7 +162,7 @@ class EventWatcher:
 
         elif topic == WITHDRAW_TOPIC:
             title = f"**New Withdrawal**"
-            message = (f"💸 Amount: **{assets_value:.2f}**\n"
+            message = (f"💸 Amount: **{assets_value:.2f}** {asset_type}\n"
                        f"📍 Address: [{formatted_address}](http://etherscan.io/address/{formatted_address})\n"
                        f"📦 Transaction Hash: [{transaction_hash}](https://etherscan.io/tx/{transaction_hash})\n"
                        f"🔗 Block Number: {block_number}\n"
